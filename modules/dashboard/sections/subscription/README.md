@@ -32,7 +32,7 @@ No requirements.
 |------|-------------|------|---------|:--------:|
 | <a name="input_alert_threshold"></a> [alert\_threshold](#input\_alert\_threshold) | n/a | `number` | `50000` | no |
 | <a name="input_collapsed"></a> [collapsed](#input\_collapsed) | n/a | `bool` | `false` | no |
-| <a name="input_notification_channels"></a> [notification\_channels](#input\_notification\_channels) | n/a | `list(string)` | `[]` | no |
+| <a name="input_notification_channels"></a> [notification\_channels](#input\_notification\_channels) | n/a | `list(string)` | n/a | yes |
 | <a name="input_subscription_prefix"></a> [subscription\_prefix](#input\_subscription\_prefix) | n/a | `string` | n/a | yes |
 | <a name="input_title"></a> [title](#input\_title) | n/a | `string` | n/a | yes |
 
