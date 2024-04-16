@@ -6,9 +6,12 @@ require (
 	chainguard.dev/sdk v0.1.19
 	cloud.google.com/go/bigquery v1.60.0
 	cloud.google.com/go/compute/metadata v0.2.3
+	cloud.google.com/go/kms v1.15.7
 	cloud.google.com/go/pubsub v1.37.0
+	github.com/bradleyfalzon/ghinstallation/v2 v2.10.0
 	github.com/chainguard-dev/clog v1.3.1
 	github.com/cloudevents/sdk-go/v2 v2.15.2
+	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/google/go-cmp v0.6.0
 	github.com/google/go-github/v60 v60.0.0
 	github.com/google/go-github/v61 v61.0.0
