@@ -141,5 +141,5 @@ variable "split_triggers" {
 variable "flush_interval" {
   description = "Flush interval for logrotate, as a duration string."
   type        = string
-  default     = ""
+  default     = "3m"
 }
