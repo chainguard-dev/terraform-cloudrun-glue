@@ -12,6 +12,11 @@ variable "denominator_align" { default = "ALIGN_RATE" }
 variable "denominator_reduce" { default = "REDUCE_SUM" }
 variable "thresholds" { default = [] }
 
+locals {
+  default_align  = "ALIGN_RATE"
+  default_reduce = "REDUCE_NONE"
+}
+
 // https://cloud.google.com/monitoring/api/ref_v3/rest/v1/projects.dashboards#XyChart
 output "widget" {
   value = {
@@ -30,18 +35,18 @@ output "widget" {
               filter = join("\n", var.numerator_filter)
               aggregation = {
                 alignmentPeriod    = var.alignment_period
-                perSeriesAligner   = var.numerator_align
-                crossSeriesReducer = var.numerator_reduce
-                groupByFields      = var.numerator_group_by_fields
+                perSeriesAligner   = var.numerator_align == local.default_align ? null : var.numerator_align
+                crossSeriesReducer = var.numerator_reduce == local.default_reduce ? null : var.numerator_reduce
+                groupByFields      = length(var.numerator_group_by_fields) == 0 ? null : var.numerator_group_by_fields
               }
             }
             denominator = {
               filter = join("\n", var.denominator_filter)
               aggregation = {
                 alignmentPeriod    = var.alignment_period
-                perSeriesAligner   = var.denominator_align
-                crossSeriesReducer = var.denominator_reduce
-                groupByFields      = var.denominator_group_by_fields
+                perSeriesAligner   = var.denominator_align == local.default_align ? null : var.denominator_align
+                crossSeriesReducer = var.denominator_reduce == local.default_reduce ? null : var.denominator_reduce
+                groupByFields      = length(var.denominator_group_by_fields)
               }
             }
           }

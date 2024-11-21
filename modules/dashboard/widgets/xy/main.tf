@@ -9,6 +9,11 @@ variable "secondary_align" { default = "ALIGN_NONE" }
 variable "secondary_reduce" { default = "REDUCE_NONE" }
 variable "thresholds" { default = [] }
 
+locals {
+  default_align  = "ALIGN_RATE"
+  default_reduce = "REDUCE_NONE"
+}
+
 // https://cloud.google.com/monitoring/api/ref_v3/rest/v1/projects.dashboards#XyChart
 output "widget" {
   value = {
@@ -23,16 +28,16 @@ output "widget" {
           timeSeriesFilter = {
             aggregation = {
               alignmentPeriod    = var.alignment_period
-              perSeriesAligner   = var.primary_align
-              crossSeriesReducer = var.primary_reduce
-              groupByFields      = var.group_by_fields
+              perSeriesAligner   = var.primary_align == local.default_align ? null : var.primary_align
+              crossSeriesReducer = var.primary_reduce == local.default_reduce ? null : var.primary_reduce
+              groupByFields      = length(var.group_by_fields) == 0 ? null : var.group_by_fields
             }
             filter = join("\n", var.filter)
             secondaryAggregation = {
               alignmentPeriod    = var.alignment_period
-              perSeriesAligner   = var.secondary_align
-              crossSeriesReducer = var.secondary_reduce
-              groupByFields      = var.group_by_fields
+              perSeriesAligner   = var.secondary_align == local.default_align ? null : var.secondary_align
+              crossSeriesReducer = var.secondary_reduce == local.default_reduce ? null : var.secondary_reduce
+              groupByFields      = length(var.group_by_fields) == 0 ? null : var.group_by_fields
             }
           }
         }

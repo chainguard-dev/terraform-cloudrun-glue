@@ -14,8 +14,8 @@ locals {
   // the section, which starts after the topmost tile of the preceding section.
   rebased = [for s in var.sections : [
     for t in s : {
-      yPos   = t.yPos + local.sum_heights[index(var.sections, s)]
-      xPos   = t.xPos
+      yPos   = t.yPos + local.sum_heights[index(var.sections, s)] != 0 ? t.yPos + local.sum_heights[index(var.sections, s)] : null
+      xPos   = t.xPos != 0 ? t.xPos : null
       height = t.height
       width  = t.width
       widget = t.widget
