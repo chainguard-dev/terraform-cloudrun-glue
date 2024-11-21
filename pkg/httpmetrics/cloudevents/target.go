@@ -13,7 +13,6 @@ import (
 
 	metrics "github.com/chainguard-dev/terraform-infra-common/pkg/httpmetrics"
 	cehttp "github.com/cloudevents/sdk-go/v2/protocol/http"
-	"google.golang.org/api/idtoken"
 )
 
 // WithTarget wraps cloudevents.WithTarget to authenticate requests with an
@@ -22,7 +21,7 @@ func WithTarget(ctx context.Context, url string) []cehttp.Option {
 	opts := make([]cehttp.Option, 0, 2)
 
 	if strings.HasPrefix(url, "https://") {
-		idc, err := idtoken.NewClient(ctx, url)
+		idc, err := metrics.NewIDTokenClient(ctx, url)
 		if err != nil {
 			log.Panicf("failed to create idtoken client: %v", err)
 		}
