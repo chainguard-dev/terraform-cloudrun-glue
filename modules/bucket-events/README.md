@@ -80,6 +80,7 @@ No requirements.
 
 | Name | Source | Version |
 |------|--------|---------|
+| <a name="module_audit-delivery-serviceaccount"></a> [audit-delivery-serviceaccount](#module\_audit-delivery-serviceaccount) | ../audit-serviceaccount | n/a |
 | <a name="module_authorize-delivery"></a> [authorize-delivery](#module\_authorize-delivery) | ../authorize-private-service | n/a |
 | <a name="module_dashboard"></a> [dashboard](#module\_dashboard) | ../dashboard | n/a |
 | <a name="module_http"></a> [http](#module\_http) | ../dashboard/sections/http | n/a |

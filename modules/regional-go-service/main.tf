@@ -79,6 +79,11 @@ moved {
 }
 
 moved {
+  from = google_monitoring_alert_policy.anomalous-service-access
+  to   = module.this.google_monitoring_alert_policy.anomalous-service-access
+}
+
+moved {
   from = google_monitoring_alert_policy.bad-rollout
   to   = module.this.google_monitoring_alert_policy.bad-rollout
 }

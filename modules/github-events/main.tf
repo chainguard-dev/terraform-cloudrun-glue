@@ -21,7 +21,7 @@ module "webhook-secret" {
   service-account  = google_service_account.service.email
   authorized-adder = var.secret_version_adder
 
-  notification-channels = var.notification_channels
+  notification_channels = var.notification_channels
 }
 
 module "this" {

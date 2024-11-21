@@ -17,7 +17,7 @@ variable "service-account" {
   type        = string
 }
 
-variable "notification-channels" {
+variable "notification_channels" {
   description = "The channels to notify if the configuration data is improperly accessed."
   type        = list(string)
 }

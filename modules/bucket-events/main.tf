@@ -55,6 +55,22 @@ resource "google_service_account_iam_binding" "allow-pubsub-to-mint-tokens" {
   members = ["serviceAccount:${google_project_service_identity.pubsub.email}"]
 }
 
+module "audit-delivery-serviceaccount" {
+  count = length(var.notification_channels) > 0 ? 1 : 0
+
+  source = "../audit-serviceaccount"
+
+  project_id      = var.project_id
+  service-account = google_service_account.delivery.email
+
+  # The absence of authorized identities here means that
+  # nothing is authorized to act as this service account.
+  # Note: Cloud Pub/Sub's usage doesn't show up in the
+  # audit logs.
+
+  notification_channels = var.notification_channels
+}
+
 module "this" {
   source     = "../regional-go-service"
   project_id = var.project_id

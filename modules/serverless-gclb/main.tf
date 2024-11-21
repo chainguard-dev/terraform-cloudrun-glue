@@ -165,3 +165,47 @@ locals {
   )
 }
 
+resource "google_monitoring_alert_policy" "abnormal-gclb-access" {
+  count = length(var.notification_channels) > 0 ? 1 : 0
+
+  # In the absence of data, incident will auto-close after an hour
+  alert_strategy {
+    auto_close = "3600s"
+
+    notification_rate_limit {
+      period = "3600s" // re-alert hourly if condition still valid.
+    }
+  }
+
+  display_name = "Abnormal GCLB Access"
+  combiner     = "OR"
+
+  conditions {
+    display_name = "Anomaly detected"
+
+    condition_matched_log {
+      filter = <<EOT
+      logName=(
+          "projects/${var.project_id}/logs/cloudaudit.googleapis.com%2Factivity"
+       OR "projects/${var.project_id}/logs/cloudaudit.googleapis.com%2Fdata_access"
+      )
+
+      protoPayload.resourceName=("${join("\" OR \"", local.audited-resources)}")
+      -- Allows robots
+      -protoPayload.authenticationInfo.principalEmail=("${join("\" OR \"", local.authorized-accounts)}")
+      -- Allow read-only operations
+      -protoPayload.methodName=~(".*\.get.*" OR ".*\.list.*" OR ".*\.aggregatedList")
+EOT
+      label_extractors = {
+        "email"       = "EXTRACT(protoPayload.authenticationInfo.principalEmail)"
+        "method_name" = "EXTRACT(protoPayload.methodName)"
+        "user_agent"  = "REGEXP_EXTRACT(protoPayload.requestMetadata.callerSuppliedUserAgent, \"(\\\\S+)\")"
+      }
+    }
+  }
+
+  notification_channels = var.notification_channels
+
+  enabled = "true"
+  project = var.project_id
+}

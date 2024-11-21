@@ -1,3 +1,18 @@
+module "audit-serviceaccount" {
+  count = length(var.notification_channels) > 0 ? 1 : 0
+
+  source = "../audit-serviceaccount"
+
+  project_id      = var.project_id
+  service-account = var.service_account
+
+  # The absence of authorized identities here means that
+  # nothing is authorized to act as this service account.
+  # Note: Cloud Run's usage doesn't show up in the audit logs.
+
+  notification_channels = var.notification_channels
+}
+
 resource "google_project_iam_member" "metrics-writer" {
   project = var.project_id
   role    = "roles/monitoring.metricWriter"
@@ -274,6 +289,61 @@ data "google_project" "project" { project_id = var.project_id }
 
 // What identity is deploying this?
 data "google_client_openid_userinfo" "me" {}
+
+// Create an alert policy to notify if the service is accessed by an unauthorized entity.
+resource "google_monitoring_alert_policy" "anomalous-service-access" {
+  count = length(var.notification_channels) > 0 ? 1 : 0
+
+  # In the absence of data, incident will auto-close after an hour
+  alert_strategy {
+    auto_close = "3600s"
+
+    notification_rate_limit {
+      period = "3600s" // re-alert hourly if condition still valid.
+    }
+  }
+
+  display_name = "Abnormal Service Access: ${var.name}"
+  combiner     = "OR"
+
+  conditions {
+    display_name = "Abnormal Service Access: ${var.name}"
+
+    condition_matched_log {
+      filter = <<EOT
+      logName="projects/${var.project_id}/logs/cloudaudit.googleapis.com%2Factivity"
+      protoPayload.serviceName="run.googleapis.com"
+      protoPayload.resourceName=("${join("\" OR \"", concat([
+      "namespaces/${var.project_id}/services/${var.name}"
+    ],
+    [
+      for region in keys(var.regions) : "projects/${var.project_id}/locations/${region}/services/${var.name}"
+    ]))}")
+
+      -- Allow CI to reconcile services and their IAM policies.
+      -(
+        protoPayload.authenticationInfo.principalEmail="${data.google_client_openid_userinfo.me.email}"
+        protoPayload.methodName=("${join("\" OR \"", [
+    "google.cloud.run.v2.Services.CreateService",
+    "google.cloud.run.v2.Services.UpdateService",
+    "google.cloud.run.v2.Services.SetIamPolicy",
+])}")
+      )
+      EOT
+
+label_extractors = {
+  "email"       = "EXTRACT(protoPayload.authenticationInfo.principalEmail)"
+  "method_name" = "EXTRACT(protoPayload.methodName)"
+  "user_agent"  = "REGEXP_EXTRACT(protoPayload.requestMetadata.callerSuppliedUserAgent, \"(\\\\S+)\")"
+}
+}
+}
+
+notification_channels = var.notification_channels
+
+enabled = "true"
+project = var.project_id
+}
 
 // When the service is behind a load balancer, then it is publicly exposed and responsible
 // for handling its own authentication.

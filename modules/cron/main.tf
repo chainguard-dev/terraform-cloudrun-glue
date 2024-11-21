@@ -18,6 +18,20 @@ resource "google_project_service" "cloudscheduler" {
   disable_on_destroy = false
 }
 
+module "audit-cronjob-serviceaccount" {
+  source = "../audit-serviceaccount"
+
+  project_id      = var.project_id
+  service-account = var.service_account
+
+  # The absence of authorized identities here means that
+  # nothing is authorized to act as this service account.
+  # Note: Cloud Run's usage doesn't show up in the
+  # audit logs.
+
+  notification_channels = var.notification_channels
+}
+
 locals {
   repo = var.repository != "" ? var.repository : "gcr.io/${var.project_id}/${var.name}"
   squad_label = {
@@ -210,6 +224,22 @@ resource "google_service_account" "delivery" {
   display_name = "Dedicated service account for invoking ${google_cloud_run_v2_job.job.name}."
 }
 
+module "audit-delivery-serviceaccount" {
+  count = length(var.notification_channels) > 0 ? 1 : 0
+
+  source = "../audit-serviceaccount"
+
+  project_id      = var.project_id
+  service-account = google_service_account.delivery.email
+
+  # The absence of authorized identities here means that
+  # nothing is authorized to act as this service account.
+  # Note: Cloud Scheduler's usage doesn't show up in the
+  # audit logs.
+
+  notification_channels = var.notification_channels
+}
+
 resource "google_cloud_run_v2_job_iam_binding" "authorize-calls" {
   project  = google_cloud_run_v2_job.job.project
   location = google_cloud_run_v2_job.job.location
@@ -258,6 +288,109 @@ data "google_project" "project" { project_id = var.project_id }
 
 // What identity is deploying this?
 data "google_client_openid_userinfo" "me" {}
+
+// Create an alert policy to notify if the job is accessed by an unauthorized entity.
+resource "google_monitoring_alert_policy" "anomalous-job-access" {
+  count = length(var.notification_channels) > 0 ? 1 : 0
+
+  # In the absence of data, incident will auto-close after an hour
+  alert_strategy {
+    auto_close = "3600s"
+
+    notification_rate_limit {
+      period = "3600s" // re-alert hourly if condition still valid.
+    }
+  }
+
+  display_name = "Abnormal CronJob Access: ${var.name}"
+  combiner     = "OR"
+
+  conditions {
+    display_name = "Abnormal CronJob Access: ${var.name}"
+
+    condition_matched_log {
+      filter = <<EOT
+      logName="projects/${var.project_id}/logs/cloudaudit.googleapis.com%2Factivity"
+      protoPayload.serviceName="run.googleapis.com"
+      protoPayload.resourceName=("${join("\" OR \"", [
+      "namespaces/${var.project_id}/jobs/${var.name}-cron",
+      "projects/${var.project_id}/locations/${var.region}/jobs/${var.name}-cron",
+      ])}")
+
+      -- Allow CI to reconcile jobs and their IAM policies.
+      -(
+        protoPayload.authenticationInfo.principalEmail="${data.google_client_openid_userinfo.me.email}"
+        protoPayload.methodName=("${join("\" OR \"", [
+      "google.cloud.run.v2.Jobs.CreateJob",
+      "google.cloud.run.v2.Jobs.UpdateJob",
+      "google.cloud.run.v2.Jobs.SetIamPolicy",
+])}")
+      )
+      -(
+        protoPayload.authenticationInfo.principalEmail=~"${join("|", concat(var.invokers, [data.google_client_openid_userinfo.me.email]))}"
+        protoPayload.methodName="google.cloud.run.v1.Jobs.RunJob"
+      )
+      EOT
+
+label_extractors = {
+  "email"       = "EXTRACT(protoPayload.authenticationInfo.principalEmail)"
+  "method_name" = "EXTRACT(protoPayload.methodName)"
+  "user_agent"  = "REGEXP_EXTRACT(protoPayload.requestMetadata.callerSuppliedUserAgent, \"(\\\\S+)\")"
+}
+}
+}
+
+notification_channels = var.notification_channels
+
+enabled = "true"
+project = var.project_id
+}
+
+// Create an alert policy to notify if the job is accessed by an unauthorized entity.
+resource "google_monitoring_alert_policy" "anomalous-job-execution" {
+  # In the absence of data, incident will auto-close after an hour
+  alert_strategy {
+    auto_close = "3600s"
+
+    notification_rate_limit {
+      period = "3600s" // re-alert hourly if condition still valid.
+    }
+  }
+
+  display_name = "Abnormal Job Execution: ${var.name}"
+  combiner     = "OR"
+
+  conditions {
+    display_name = "Abnormal Job Execution: ${var.name}"
+
+    condition_matched_log {
+      filter = <<EOT
+      logName="projects/${var.project_id}/logs/cloudaudit.googleapis.com%2Fdata_access"
+      protoPayload.serviceName="run.googleapis.com"
+      protoPayload.methodName="google.cloud.run.v1.Jobs.RunJob"
+      protoPayload.resourceName=("${join("\" OR \"", [
+      "namespaces/${var.project_id}/jobs/${var.name}-cron",
+      "projects/${var.project_id}/locations/${var.region}/jobs/${var.name}-cron",
+])}")
+
+      -- Allow the delivery service account to run the job, but flag anyone else
+      -protoPayload.authenticationInfo.principalEmail=~"${join("|", [google_service_account.delivery.email, data.google_client_openid_userinfo.me.email])}"
+      EOT
+
+label_extractors = {
+  "email"       = "EXTRACT(protoPayload.authenticationInfo.principalEmail)"
+  "method_name" = "EXTRACT(protoPayload.methodName)"
+  "user_agent"  = "REGEXP_EXTRACT(protoPayload.requestMetadata.callerSuppliedUserAgent, \"(\\\\S+)\")"
+}
+}
+}
+
+notification_channels = var.notification_channels
+
+enabled = "true"
+project = var.project_id
+}
+
 
 resource "google_monitoring_alert_policy" "success" {
   count = var.success_alert_alignment_period_seconds == 0 ? 0 : 1

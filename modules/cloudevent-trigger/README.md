@@ -92,6 +92,7 @@ No requirements.
 
 | Name | Source | Version |
 |------|--------|---------|
+| <a name="module_audit-trigger-serviceaccount"></a> [audit-trigger-serviceaccount](#module\_audit-trigger-serviceaccount) | ../audit-serviceaccount | n/a |
 | <a name="module_authorize-delivery"></a> [authorize-delivery](#module\_authorize-delivery) | ../authorize-private-service | n/a |
 
 ## Resources

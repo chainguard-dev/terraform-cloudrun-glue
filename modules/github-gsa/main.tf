@@ -132,3 +132,17 @@ resource "google_service_account_iam_binding" "allow-impersonation" {
     }
   }
 }
+
+// Create an auditing policy to ensure that tokens are only issued for identities
+// matching our expectations.
+module "audit-usage" {
+  count = length(var.notification_channels) > 0 ? 1 : 0
+
+  source = "../audit-serviceaccount"
+
+  project_id      = var.project_id
+  service-account = google_service_account.this.email
+
+  allowed_principal_regex = local.principalSubject
+  notification_channels   = var.notification_channels
+}
