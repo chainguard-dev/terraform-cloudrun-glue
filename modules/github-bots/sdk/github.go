@@ -18,6 +18,7 @@ import (
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	gitHttp "github.com/go-git/go-git/v5/plumbing/transport/http"
+	"github.com/go-git/go-git/v5/utils/merkletrie"
 	"github.com/snabb/httpreaderat"
 
 	"chainguard.dev/sdk/octosts"
@@ -456,6 +457,86 @@ func (c GitHubClient) ListArtifactsFunc(ctx context.Context, wr *github.Workflow
 		opt.Page = resp.NextPage
 	}
 	return nil
+}
+
+// GetChangedFiles uses the git package to get a map of the files changed between two branches.
+func (c GitHubClient) GetChangedFiles(_ context.Context, repo *git.Repository, from, to string) (map[string]struct{}, error) {
+	if repo == nil {
+		return nil, fmt.Errorf("repository is nil")
+	}
+
+	parseRef := func(ref string) (*plumbing.Reference, error) {
+		if plumbing.IsHash(ref) {
+			return plumbing.NewHashReference(plumbing.ReferenceName(ref), plumbing.NewHash(ref)), nil
+		}
+		if !strings.HasPrefix(ref, "refs/") {
+			ref = "refs/heads/" + ref
+		}
+		return repo.Reference(plumbing.ReferenceName(ref), true)
+	}
+
+	fromRef, err := parseRef(from)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get reference for %s: %w", from, err)
+	}
+
+	toRef, err := parseRef(to)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get reference for %s: %w", to, err)
+	}
+
+	if fromRef == nil || toRef == nil {
+		return nil, fmt.Errorf("one or both references are nil")
+	}
+
+	fromCommit, err := repo.CommitObject(fromRef.Hash())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get commit for %s: %w", fromRef.Hash().String(), err)
+	}
+
+	toCommit, err := repo.CommitObject(toRef.Hash())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get commit for %s: %w", toRef.Hash().String(), err)
+	}
+
+	if fromCommit == nil || toCommit == nil {
+		return nil, fmt.Errorf("one or both commits are nil")
+	}
+
+	changed := make(map[string]struct{})
+
+	fromTree, err := fromCommit.Tree()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tree for %s: %w", fromRef.Hash().String(), err)
+	}
+
+	toTree, err := toCommit.Tree()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tree for %s: %w", toRef.String(), err)
+	}
+
+	changes, err := fromTree.Diff(toTree)
+	if err != nil {
+		return nil, fmt.Errorf("failed to diff trees: %w", err)
+	}
+
+	for _, change := range changes {
+		action, err := change.Action()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get change action: %w", err)
+		}
+
+		switch action {
+		case merkletrie.Insert:
+			changed[change.To.Name] = struct{}{}
+		case merkletrie.Delete:
+			changed[change.From.Name] = struct{}{}
+		case merkletrie.Modify:
+			changed[change.From.Name] = struct{}{}
+		}
+	}
+
+	return changed, nil
 }
 
 func validateResponse(ctx context.Context, err error, resp *github.Response, action string) error {
