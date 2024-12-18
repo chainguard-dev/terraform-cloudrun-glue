@@ -34,6 +34,35 @@ resource "google_dns_record_set" "cloud-run-cname" {
 }
 
 // Create a special DNS zone attached to the network in which
+// we will operate our services that reroutes *.google.com
+// that we control.
+resource "google_dns_managed_zone" "private-google-com" {
+  project     = var.project_id
+  name        = "private-google-com-${random_string.suffix.result}"
+  dns_name    = "google.com."
+  description = "This reroutes google.com requests to private.googleapis.com"
+
+  visibility = "private"
+
+  private_visibility_config {
+    networks {
+      network_url = google_compute_network.this.id
+    }
+  }
+}
+
+// Create a record for *.google.com that points to private.googleapis.com
+resource "google_dns_record_set" "private-google-com-cname" {
+  project      = var.project_id
+  name         = "*.google.com."
+  managed_zone = google_dns_managed_zone.private-google-com.name
+  type         = "CNAME"
+  ttl          = 60
+
+  rrdatas = ["private.googleapis.com."]
+}
+
+// Create a special DNS zone attached to the network in which
 // we will operate our services that reroutes private.googleapis.com
 // to records that we control.
 resource "google_dns_managed_zone" "private-google-apis" {
